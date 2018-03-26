@@ -2,14 +2,19 @@ package br.com.cten.financask.ui.activity
 
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView
 import br.com.cten.financask.R
-import br.com.cten.financask.delegate.TransacaoDelegate
+import br.com.cten.financask.dao.TransacaoDAO
 import br.com.cten.financask.model.Tipo
 import br.com.cten.financask.model.Transacao
 import br.com.cten.financask.ui.ResumoView
 import br.com.cten.financask.ui.adapter.ListaTransacoesAdapter
 import br.com.cten.financask.ui.dialog.AdicionaTransacaoDialog
+import br.com.cten.financask.ui.dialog.AlteraTransacaoDialog
 import kotlinx.android.synthetic.main.activity_lista_transacoes.*
 
 /**
@@ -17,13 +22,31 @@ import kotlinx.android.synthetic.main.activity_lista_transacoes.*
  */
 class ListaTransacoesActivity : AppCompatActivity() {
 
-    private val transacoes: MutableList<Transacao> = mutableListOf() // recebe uma lista vazia
+    // private val transacoes: MutableList<Transacao> = mutableListOf() // recebe uma lista vazia
+
+    private val dao = TransacaoDAO()
+    private val transacoes = dao.transacoes
+
+    private val viewDaActivity: View by lazy { // by lazy-> vou inicializar quando a property for utilizada
+        window.decorView
+    }
+
+    private val viewGroupDaActivity by lazy { // by lazy-> vou inicializar quando a property for utilizada
+        viewDaActivity as ViewGroup
+    }
+
+    // private lateinit var viewDaActivity: View // lateinit -> digo que a variavel será inicializada depois
+    // private var viewDaActivity: View? = null
+    // ? -> variavel tbm pode receber valor nulo (null safety)
+    // !! -> eu me responsabilizo pelo codigo, sobre uma variavel que pode ser nula (PERIGOSO)
 
     // Parâmetros na notação Pascal
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContentView(R.layout.activity_lista_transacoes)
+
+        // viewDaActivity = window.decorView // não é necessário inicializar aqui, já que foi inicializado pelo "by lazy"
 
         // val = final e var = variaveis mutáveis
         // Named Parameter: nomear os parametros, para que nao seja necessario se preocupar com ordem
@@ -51,25 +74,26 @@ class ListaTransacoesActivity : AppCompatActivity() {
     }
 
     private fun chamaDialogTheAdicao(tipo: Tipo) {
-        AdicionaTransacaoDialog(this, window.decorView as ViewGroup)
-                .chama(tipo, object : TransacaoDelegate {
-                    override fun delegate(transacao: Transacao) {
+        AdicionaTransacaoDialog(viewGroupDaActivity, this)
+                .chama(tipo) { // HOF no final
 
-                        atualizaTransacoes(transacao)
+                        adiciona(it)
                         lista_transacoes_adiciona_menu.close(true)
-                    }
-                })
+                }
     }
 
-    private fun atualizaTransacoes(transacao: Transacao) {
-        transacoes.add(transacao)
+    private fun adiciona(transacao: Transacao) {
+        dao.adiciona(transacao)
+        atualizaTransacoes()
+    }
+
+    private fun atualizaTransacoes() {
         configuraLista()
         configuraResumo()
     }
 
     private fun configuraResumo() {
-        val view = window.decorView // tela da activity
-        val resumoView = ResumoView(this, view, transacoes)
+        val resumoView = ResumoView(this, viewDaActivity, transacoes)
 
         resumoView.atualiza()
     }
@@ -77,6 +101,54 @@ class ListaTransacoesActivity : AppCompatActivity() {
 
     private fun configuraLista() {
         // findViewById<ListView>(R.id.lista_transacoes_listview)
-        lista_transacoes_listview.adapter = ListaTransacoesAdapter(transacoes, this)
+        val listaTransacoesAdapter = ListaTransacoesAdapter(transacoes, this)
+
+        // chama o objeto apenas uma vez, e executa operações com ele
+        with(lista_transacoes_listview) {
+            // this aqui se refere a listview
+            // this@ListaTransacoesActivity
+            adapter = listaTransacoesAdapter
+            setOnItemClickListener { _, _, position, _ ->
+                val transacao = transacoes[position]
+                chamaDialogDeAlteracao(transacao, position)
+            }
+
+            setOnCreateContextMenuListener { menu, _, _ ->
+
+                menu.add(Menu.NONE, 1, Menu.NONE, "Remover")
+            }
+        }
+    }
+
+    override fun onContextItemSelected(item: MenuItem?): Boolean {
+
+        val idDoMenu = item?.itemId
+
+        if(idDoMenu == 1) {
+            val adapterMenuInfo = item.menuInfo as AdapterView.AdapterContextMenuInfo
+            val posicaoDaTransacao = adapterMenuInfo.position
+
+            remove(posicaoDaTransacao)
+        }
+
+        return super.onContextItemSelected(item)
+    }
+
+    private fun remove(posicao: Int) {
+        dao.remove(posicao)
+        atualizaTransacoes()
+    }
+
+    private fun chamaDialogDeAlteracao(transacao: Transacao, position: Int) {
+        AlteraTransacaoDialog(this, viewGroupDaActivity)
+                .chama(transacao, { transacaoAlterada ->
+
+                        altera(transacaoAlterada, position)
+                })
+    }
+
+    private fun altera(transacao: Transacao, position: Int) {
+        dao.altera(transacao, position)
+        atualizaTransacoes()
     }
 }

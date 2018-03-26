@@ -31,7 +31,10 @@ class ResumoView(private val context: Context,
 
         val totalReceita = resumo.receita
 
-        // chama o objeto apenas uma vez, e executa operações com ele
+        // Safe call: adicionar ? na variavel é equivalente a if(view != null) {}
+        //view?.resumo_card_receita?.setTextColor(corReceita)
+        //view?.resumo_card_receita?.text = totalReceita.formataParaBrasileiro()
+
         with(view.resumo_card_receita) {
             setTextColor(corReceita)
             text = totalReceita.formataParaBrasileiro()
@@ -41,7 +44,12 @@ class ResumoView(private val context: Context,
     private fun adicionaDespesa() {
 
         val totalDespesa = resumo.despesa()
-
+        /*view?.let {
+            with(it.resumo_card_despesa) {
+                setTextColor(corDespesa)
+                text = totalDespesa.formataParaBrasileiro()
+            }
+        }*/
         with(view.resumo_card_despesa) {
             setTextColor(corDespesa)
             text = totalDespesa.formataParaBrasileiro()
@@ -52,7 +60,6 @@ class ResumoView(private val context: Context,
 
         val total = resumo.total()
         val cor: Int = corPor(total)
-
         with(view.resumo_card_total) {
             setTextColor(cor)
             text = total.formataParaBrasileiro()
